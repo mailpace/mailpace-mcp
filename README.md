@@ -6,7 +6,7 @@ MailPace MCP (Model Context Protocol) Server is an MCP server implementation tha
 
 ## Features
 
-- Send email over the (MailPace)[https://mailpace.com] Transactional Email API
+- Send email over the [MailPace](https://mailpace.com) Transactional Email API
 
 ## Tool
 
