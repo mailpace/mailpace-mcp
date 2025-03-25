@@ -19,6 +19,14 @@ Sends an email to one or more recipients.
 
 ## Usage
 
+### Installing via Smithery
+
+To install MailPace MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@mailpace/mailpace-mcp):
+
+```bash
+npx -y @smithery/cli install @mailpace/mailpace-mcp --client claude
+```
+
 ### Domain and Token
 
 - Create an organization and domain at https://app.mailpace.com

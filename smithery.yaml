@@ -1,0 +1,22 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    properties:
+      mailpaceApiToken:
+        type: string
+        description: MailPace API token for sending emails. Can also be set in the
+          MAILPACE_API_TOKEN env variable.
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => ({
+      command: 'npm',
+      args: ['run', 'start'].concat(config.mailpaceApiToken ? ['--token', config.mailpaceApiToken] : []),
+      env: config.mailpaceApiToken ? { MAILPACE_API_TOKEN: config.mailpaceApiToken } : {}
+    })
+  exampleConfig:
+    mailpaceApiToken: dummy-token-123
