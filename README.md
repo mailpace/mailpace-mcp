@@ -1,20 +1,34 @@
 # MailPace MCP (Model Context Protocol) Server
 
-## Overview
+[![smithery badge](https://smithery.ai/badge/@mailpace/mailpace-mcp)](https://smithery.ai/server/@smithery-ai/server-sequential-thinking)
 
-MailPace MCP (Model Context Protocol) Server is a ...
+MailPace MCP (Model Context Protocol) Server is an MCP server implementation that allows sending emails over MailPace's fast transactional email API.
 
 ## Features
 
+- Send email over the (MailPace)[https://mailpace.com] Transactional Email API
 
-## Installation
+## Tool
 
+### send-email
+
+Sends an email to one or more recipients.
+
+**Inputs**
+- Email with fields shown in MailPace documentation: https://docs.mailpace.com/reference/send/
 
 ## Usage
 
+### Domain and Token
 
+- Create an organization and domain at https://app.mailpace.com
+- Copy your domain API token
+- Start the MCP with the `MAILPACE_API_TOKEN` env set, or pass it to the server with the `--token` argument
 
-The server will start running on the default port. You can configure the port and other settings in the `config.json` file.
+## Build and run
+
+`npm run build`
+`npm run start`
 
 ## Contributing
 
@@ -31,4 +45,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For any questions or support, please contact us at support@mailpace.com.
+For any questions or support, please contact us at support@mailpace.com
