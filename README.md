@@ -1,6 +1,6 @@
 # MailPace MCP (Model Context Protocol) Server
 
-[![smithery badge](https://smithery.ai/badge/@mailpace/mailpace-mcp)](https://smithery.ai/server/@smithery-ai/server-sequential-thinking)
+[![smithery badge](https://smithery.ai/badge/@mailpace/mailpace-mcp)](https://smithery.ai/server/@mailpace/mailpace-mcp)
 
 MailPace MCP (Model Context Protocol) Server is an MCP server implementation that allows sending emails over MailPace's fast transactional email API.
 
@@ -18,6 +18,14 @@ Sends an email to one or more recipients.
 - Email with fields shown in MailPace documentation: https://docs.mailpace.com/reference/send/
 
 ## Usage
+
+### Installing via Smithery
+
+To install MailPace MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@mailpace/mailpace-mcp):
+
+```bash
+npx -y @smithery/cli install @mailpace/mailpace-mcp --client claude
+```
 
 ### Domain and Token
 
