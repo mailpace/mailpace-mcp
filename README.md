@@ -4,6 +4,10 @@
 
 MailPace MCP (Model Context Protocol) Server is an MCP server implementation that allows sending emails over MailPace's fast transactional email API.
 
+<a href="https://glama.ai/mcp/servers/@mailpace/mailpace-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@mailpace/mailpace-mcp/badge" alt="MailPace Server MCP server" />
+</a>
+
 ## Features
 
 - Send email over the [MailPace](https://mailpace.com) Transactional Email API
