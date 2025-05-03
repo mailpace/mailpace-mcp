@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/mailpace-mailpace-mcp-badge.png)](https://mseep.ai/app/mailpace-mailpace-mcp)
+
 # MailPace MCP (Model Context Protocol) Server
 
 [![smithery badge](https://smithery.ai/badge/@mailpace/mailpace-mcp)](https://smithery.ai/server/@mailpace/mailpace-mcp)
