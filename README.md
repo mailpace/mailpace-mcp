@@ -38,6 +38,15 @@ npx -y @smithery/cli install @mailpace/mailpace-mcp --client claude
 `npm run build`
 `npm run start`
 
+
+
+## Running evals
+
+The evals package loads an mcp client that then runs the index.ts file, so there is no need to rebuild between tests. You can load environment variables by prefixing the npx command. Full documentation can be found [here](https://www.mcpevals.io/docs).
+
+```bash
+OPENAI_API_KEY=your-key  npx mcp-eval evals.ts index.ts
+```
 ## Contributing
 
 We welcome contributions to the MailPace MCP Server. To contribute, please follow these steps:
