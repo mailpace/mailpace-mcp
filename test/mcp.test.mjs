@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import http from "node:http";
 import { after, test } from "node:test";
 
@@ -216,6 +217,16 @@ async function harness(options) {
 
 after(async () => {
   await Promise.all(harnesses.map((instance) => instance.close()));
+});
+
+test("registry metadata matches package metadata", () => {
+  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+  const serverJson = JSON.parse(readFileSync("server.json", "utf8"));
+
+  assert.equal(packageJson.mcpName, serverJson.name);
+  assert.equal(packageJson.version, serverJson.version);
+  assert.equal(serverJson.packages[0].identifier, packageJson.name);
+  assert.equal(serverJson.packages[0].version, packageJson.version);
 });
 
 test("registers all tools when both tokens are present", async () => {

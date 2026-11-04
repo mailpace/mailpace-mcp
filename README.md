@@ -115,6 +115,47 @@ docker run --rm -i \
 
 The image runs as the non-root `node` user and installs only production dependencies.
 
+## Publishing
+
+The package is published as `mailpace-mcp` on npm and registered with the [Official MCP Registry](https://registry.modelcontextprotocol.io) as:
+
+```text
+com.mailpace/mailpace-mcp
+```
+
+`package.json` contains the matching `mcpName` field, and `server.json` contains the registry metadata.
+
+### One-time setup
+
+1. Create an npm automation token with publish access and add it as the `NPM_TOKEN` repository secret.
+2. Generate an Ed25519 key pair for DNS authentication:
+
+   ```bash
+   openssl genpkey -algorithm Ed25519 -out key.pem
+   PUBLIC_KEY="$(openssl pkey -in key.pem -pubout -outform DER | tail -c 32 | base64)"
+   echo "mailpace.com. IN TXT \"v=MCPv1; k=ed25519; p=${PUBLIC_KEY}\""
+   ```
+
+3. Add the printed TXT record to `mailpace.com` DNS.
+4. Add the private key as the `MCP_PRIVATE_KEY` repository secret:
+
+   ```bash
+   openssl pkey -in key.pem -noout -text | grep -A3 "priv:" | tail -n +2 | tr -d ' :\n'
+   ```
+
+   Do not commit `key.pem`; it is gitignored.
+
+### Releasing
+
+Update `package.json` and `server.json` to the new version, commit, then push a matching tag:
+
+```bash
+git tag v2.0.0
+git push origin v2.0.0
+```
+
+The `Release` workflow runs typechecking and tests, verifies the tag matches `package.json`, publishes to npm, waits for the package to appear, and publishes the version metadata to the Official MCP Registry.
+
 ## Security
 
 - Tokens are read from the environment only.

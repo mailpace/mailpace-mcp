@@ -1,0 +1,58 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.mailpace/mailpace-mcp",
+  "title": "MailPace",
+  "description": "Send transactional email and manage MailPace domains from MCP clients.",
+  "repository": {
+    "url": "https://github.com/mailpace/mailpace-mcp",
+    "source": "github"
+  },
+  "version": "2.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "mailpace-mcp",
+      "version": "2.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MAILPACE_API_TOKEN",
+          "description": "Domain API token for sending email and domain-scoped status lookups.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "MAILPACE_ORGANIZATION_TOKEN",
+          "description": "Organization API token for domain and domain API token management.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "MAILPACE_ALLOWED_RECIPIENTS",
+          "description": "Optional comma-separated recipient allowlist of exact addresses or @domain rules.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "MAILPACE_REQUEST_TIMEOUT_MS",
+          "description": "Optional per-request timeout in milliseconds. Defaults to 30000.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "MAILPACE_MAX_RETRIES",
+          "description": "Optional retry count for idempotent requests and 429 responses. Defaults to 2.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

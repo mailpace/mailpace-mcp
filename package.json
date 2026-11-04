@@ -1,6 +1,7 @@
 {
   "name": "mailpace-mcp",
   "version": "2.0.0",
+  "mcpName": "com.mailpace/mailpace-mcp",
   "description": "MCP server for the MailPace Send API, Domains API, and Email Status API",
   "main": "build/index.js",
   "type": "module",
