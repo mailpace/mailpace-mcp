@@ -175,6 +175,27 @@ const ATTACHMENT_EXTENSIONS = new Set([
 ]);
 const MAX_RECIPIENTS = 50;
 const MAX_ATTACHMENT_BYTES = 30 * 1024 * 1024;
+const ALLOWED_RECIPIENTS = (process.env.MAILPACE_ALLOWED_RECIPIENTS || "")
+  .split(",")
+  .map((entry) => entry.trim().toLowerCase())
+  .filter(Boolean);
+
+function bareAddress(value: string): string {
+  const trimmed = value.trim();
+  const angleMatch = trimmed.match(/^.*<([^<>]+)>$/);
+  return (angleMatch ? angleMatch[1] : trimmed).trim();
+}
+
+function isRecipientAllowed(value: string): boolean {
+  if (ALLOWED_RECIPIENTS.length === 0) {
+    return true;
+  }
+
+  const address = bareAddress(value).toLowerCase();
+  return ALLOWED_RECIPIENTS.some((rule) =>
+    rule.startsWith("@") ? address.endsWith(rule) : address === rule
+  );
+}
 
 function splitAddressList(value: string): string[] {
   const parts: string[] = [];
@@ -648,6 +669,19 @@ if (apiToken) {
     },
     async ({ idempotency_key, ...email }, ctx) => {
       try {
+        const disallowedRecipient = [email.to, email.cc, email.bcc]
+          .filter((address): address is string => Boolean(address))
+          .flatMap(splitAddressList)
+          .find((address) => !isRecipientAllowed(address));
+
+        if (disallowedRecipient) {
+          return errorResult(
+            `Recipient ${bareAddress(
+              disallowedRecipient
+            )} is not permitted by MAILPACE_ALLOWED_RECIPIENTS`
+          );
+        }
+
         const result = (await serverRequest("/send", {
           method: "POST",
           body: email,
@@ -1010,7 +1044,11 @@ async function main() {
   console.error(
     `MailPace MCP Server running on stdio (email sending: ${
       apiToken ? "enabled" : "disabled"
-    }, domain management: ${organizationToken ? "enabled" : "disabled"})`
+    }, domain management: ${organizationToken ? "enabled" : "disabled"}${
+      ALLOWED_RECIPIENTS.length > 0
+        ? `, recipient allowlist: ${ALLOWED_RECIPIENTS.length} rule(s)`
+        : ""
+    })`
   );
 }
 
