@@ -23,6 +23,10 @@ if (!apiToken && !organizationToken) {
 
 const API_BASE_URL =
   process.env.MAILPACE_API_URL || "https://app.mailpace.com/api/v1";
+const REQUEST_TIMEOUT_MS = Number(
+  process.env.MAILPACE_REQUEST_TIMEOUT_MS || 30_000
+);
+const MAX_RETRIES = Number(process.env.MAILPACE_MAX_RETRIES ?? 2);
 
 const server = new McpServer(
   {
@@ -351,35 +355,121 @@ type ApiRequestOptions = {
   headers?: Record<string, string>;
   token: string;
   tokenHeader: "MailPace-Organization-Token" | "MailPace-Server-Token";
+  signal?: AbortSignal;
 };
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("MailPace API request cancelled"));
+      return;
+    }
+
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new Error("MailPace API request cancelled"));
+      },
+      { once: true }
+    );
+  });
+}
+
+function retryDelayMs(attempt: number, response?: Response): number {
+  const retryAfter = response?.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) {
+      return Math.max(0, seconds * 1000);
+    }
+
+    const date = Date.parse(retryAfter);
+    if (!Number.isNaN(date)) {
+      return Math.max(0, date - Date.now());
+    }
+  }
+
+  return Math.min(1000 * 2 ** attempt, 10_000);
+}
 
 async function apiRequest(
   path: string,
   options: ApiRequestOptions
 ): Promise<unknown> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method || "GET",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      [options.tokenHeader]: options.token,
-      ...options.headers,
-    },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  const url = `${API_BASE_URL}${path}`;
+  const method = options.method || "GET";
+  const body =
+    options.body === undefined ? undefined : JSON.stringify(options.body);
+  const isIdempotent =
+    ["GET", "HEAD", "PATCH", "DELETE"].includes(method) ||
+    Boolean(options.headers?.["Idempotency-Key"]);
 
-  const responseText = await response.text();
-  let data: unknown = null;
+  for (let attempt = 0; ; attempt += 1) {
+    const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const signal = options.signal
+      ? AbortSignal.any([options.signal, timeoutSignal])
+      : timeoutSignal;
 
-  if (responseText) {
+    let response: Response;
     try {
-      data = JSON.parse(responseText);
-    } catch {
-      data = responseText;
-    }
-  }
+      response = await fetch(url, {
+        method,
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          [options.tokenHeader]: options.token,
+          ...options.headers,
+        },
+        body,
+        signal,
+      });
+    } catch (error: any) {
+      if (options.signal?.aborted) {
+        throw new Error("MailPace API request cancelled");
+      }
+      if (error?.name === "TimeoutError") {
+        throw new Error(
+          `MailPace API request timed out after ${REQUEST_TIMEOUT_MS}ms`
+        );
+      }
 
-  if (!response.ok) {
+      const cause = error?.cause?.message ? `: ${error.cause.message}` : "";
+      const message = `${error?.message || "Network request failed"}${cause}`;
+
+      if (isIdempotent && attempt < MAX_RETRIES) {
+        await sleep(retryDelayMs(attempt), options.signal);
+        continue;
+      }
+
+      throw new Error(`MailPace API request failed: ${message}`);
+    }
+
+    const responseText = await response.text();
+    let data: unknown = null;
+
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = responseText;
+      }
+    }
+
+    if (response.ok) {
+      return data;
+    }
+
+    if (
+      (response.status === 429 || response.status >= 500) &&
+      attempt < MAX_RETRIES &&
+      (isIdempotent || response.status === 429)
+    ) {
+      await sleep(retryDelayMs(attempt, response), options.signal);
+      continue;
+    }
+
     let detail = responseText;
     if (data && typeof data === "object") {
       const errorData = data as Record<string, unknown>;
@@ -393,8 +483,6 @@ async function apiRequest(
       }): ${detail || "Unknown error"}`
     );
   }
-
-  return data;
 }
 
 function organizationRequest(
@@ -454,7 +542,7 @@ if (apiToken) {
         openWorldHint: true,
       },
     },
-    async ({ idempotency_key, ...email }, _extra) => {
+    async ({ idempotency_key, ...email }, ctx) => {
       try {
         const result = (await serverRequest("/send", {
           method: "POST",
@@ -462,6 +550,7 @@ if (apiToken) {
           headers: idempotency_key
             ? { "Idempotency-Key": idempotency_key }
             : undefined,
+          signal: ctx.mcpReq.signal,
         })) as { id: number; status: string };
 
         return jsonResult({ id: result.id, status: result.status });
@@ -517,12 +606,16 @@ if (apiToken || organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ domain_id, id }) =>
+    async ({ domain_id, id }, ctx) =>
       runApiTool(
         () =>
           organizationToken
-            ? organizationRequest(`/domains/${domain_id}/emails/${id}`)
-            : serverRequest(`/domains/${domain_id}/emails/${id}`),
+            ? organizationRequest(`/domains/${domain_id}/emails/${id}`, {
+                signal: ctx.mcpReq.signal,
+              })
+            : serverRequest(`/domains/${domain_id}/emails/${id}`, {
+                signal: ctx.mcpReq.signal,
+              }),
         "MailPace Email Status API"
       )
   );
@@ -549,7 +642,7 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ limit, offset, sort, direction }) => {
+    async ({ limit, offset, sort, direction }, ctx) => {
       const params = new URLSearchParams();
       if (limit !== undefined) params.set("limit", String(limit));
       if (offset !== undefined) params.set("offset", String(offset));
@@ -559,7 +652,8 @@ if (organizationToken) {
       const query = params.toString();
       return runOrganizationTool(async () => ({
         domains: await organizationRequest(
-          `/domains${query ? `?${query}` : ""}`
+          `/domains${query ? `?${query}` : ""}`,
+          { signal: ctx.mcpReq.signal }
         ),
       }));
     }
@@ -581,8 +675,10 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ id }) =>
-      runOrganizationTool(() => organizationRequest(`/domains/${id}`))
+    async ({ id }, ctx) =>
+      runOrganizationTool(() =>
+        organizationRequest(`/domains/${id}`, { signal: ctx.mcpReq.signal })
+      )
   );
 
   server.registerTool(
@@ -604,11 +700,12 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ url, name }) =>
+    async ({ url, name }, ctx) =>
       runOrganizationTool(() =>
         organizationRequest("/domains", {
           method: "POST",
           body: { domain: { url, ...(name !== undefined ? { name } : {}) } },
+          signal: ctx.mcpReq.signal,
         })
       )
   );
@@ -635,7 +732,7 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ id, name, url }) => {
+    async ({ id, name, url }, ctx) => {
       if (name === undefined && url === undefined) {
         return errorResult("Provide at least one of name or url to update");
       }
@@ -649,6 +746,7 @@ if (organizationToken) {
               ...(url !== undefined ? { url } : {}),
             },
           },
+          signal: ctx.mcpReq.signal,
         })
       );
     }
@@ -671,9 +769,12 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ id }) =>
+    async ({ id }, ctx) =>
       runOrganizationTool(() =>
-        organizationRequest(`/domains/${id}/verify`, { method: "POST" })
+        organizationRequest(`/domains/${id}/verify`, {
+          method: "POST",
+          signal: ctx.mcpReq.signal,
+        })
       )
   );
 
@@ -693,10 +794,11 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ domain_id }) =>
+    async ({ domain_id }, ctx) =>
       runOrganizationTool(async () => ({
         api_tokens: await organizationRequest(
-          `/domains/${domain_id}/api_tokens`
+          `/domains/${domain_id}/api_tokens`,
+          { signal: ctx.mcpReq.signal }
         ),
       }))
   );
@@ -718,9 +820,11 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ domain_id, id }) =>
+    async ({ domain_id, id }, ctx) =>
       runOrganizationTool(() =>
-        organizationRequest(`/domains/${domain_id}/api_tokens/${id}`)
+        organizationRequest(`/domains/${domain_id}/api_tokens/${id}`, {
+          signal: ctx.mcpReq.signal,
+        })
       )
   );
 
@@ -742,11 +846,12 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ domain_id, name }) =>
+    async ({ domain_id, name }, ctx) =>
       runOrganizationTool(() =>
         organizationRequest(`/domains/${domain_id}/api_tokens`, {
           method: "POST",
           body: { api_token: { ...(name !== undefined ? { name } : {}) } },
+          signal: ctx.mcpReq.signal,
         })
       )
   );
@@ -769,7 +874,7 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ domain_id, id, name }) => {
+    async ({ domain_id, id, name }, ctx) => {
       if (name === undefined) {
         return errorResult("Provide a name to update the API token");
       }
@@ -778,6 +883,7 @@ if (organizationToken) {
         organizationRequest(`/domains/${domain_id}/api_tokens/${id}`, {
           method: "PATCH",
           body: { api_token: { name } },
+          signal: ctx.mcpReq.signal,
         })
       );
     }
@@ -801,10 +907,11 @@ if (organizationToken) {
         openWorldHint: true,
       },
     },
-    async ({ domain_id, id }) =>
+    async ({ domain_id, id }, ctx) =>
       runOrganizationTool(() =>
         organizationRequest(`/domains/${domain_id}/api_tokens/${id}`, {
           method: "DELETE",
+          signal: ctx.mcpReq.signal,
         })
       )
   );
