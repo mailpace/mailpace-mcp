@@ -1,6 +1,6 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
+import { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import * as z from "zod/v4";
 import minimist from "minimist";
 
 const argv = minimist(process.argv.slice(2));
@@ -135,31 +135,34 @@ async function runOrganizationTool(
 
 // Define the email tool
 if (apiToken) {
-  server.tool(
+  server.registerTool(
     "send-email",
     {
-      from: z.string().email(),
-      to: z.string(),
-      subject: z.string().optional(),
-      htmlbody: z.string().optional(),
-      textbody: z.string().optional(),
-      cc: z.string().optional(),
-      bcc: z.string().optional(),
-      replyto: z.string().optional(),
-      inreplyto: z.string().optional(),
-      references: z.string().optional(),
-      list_unsubscribe: z.string().optional(),
-      attachments: z
-        .array(
-          z.object({
-            name: z.string(),
-            content: z.string(),
-            content_type: z.string(),
-            cid: z.string().optional(),
-          })
-        )
-        .optional(),
-      tags: z.union([z.string(), z.array(z.string())]).optional(),
+      description: "Send a transactional email through MailPace.",
+      inputSchema: z.object({
+        from: z.string().email(),
+        to: z.string(),
+        subject: z.string().optional(),
+        htmlbody: z.string().optional(),
+        textbody: z.string().optional(),
+        cc: z.string().optional(),
+        bcc: z.string().optional(),
+        replyto: z.string().optional(),
+        inreplyto: z.string().optional(),
+        references: z.string().optional(),
+        list_unsubscribe: z.string().optional(),
+        attachments: z
+          .array(
+            z.object({
+              name: z.string(),
+              content: z.string(),
+              content_type: z.string(),
+              cid: z.string().optional(),
+            })
+          )
+          .optional(),
+        tags: z.union([z.string(), z.array(z.string())]).optional(),
+      }),
     },
     async (params, _extra) => {
       try {
@@ -224,14 +227,16 @@ if (apiToken) {
 
 // Domains API tools. These require an Organization API token.
 if (organizationToken) {
-  server.tool(
+  server.registerTool(
     "list-domains",
-    "List the domains belonging to your MailPace organization.",
     {
-      limit: z.number().int().min(1).max(200).optional(),
-      offset: z.number().int().min(0).optional(),
-      sort: z.enum(["created_at", "id", "name"]).optional(),
-      direction: z.enum(["asc", "desc"]).optional(),
+      description: "List the domains belonging to your MailPace organization.",
+      inputSchema: z.object({
+        limit: z.number().int().min(1).max(200).optional(),
+        offset: z.number().int().min(0).optional(),
+        sort: z.enum(["created_at", "id", "name"]).optional(),
+        direction: z.enum(["asc", "desc"]).optional(),
+      }),
     },
     async ({ limit, offset, sort, direction }) => {
       const params = new URLSearchParams();
@@ -247,24 +252,28 @@ if (organizationToken) {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "get-domain",
-    "Get a single MailPace domain by ID.",
     {
-      id: z.number().int().describe("The domain ID"),
+      description: "Get a single MailPace domain by ID.",
+      inputSchema: z.object({
+        id: z.number().int().describe("The domain ID"),
+      }),
     },
     async ({ id }) =>
       runOrganizationTool(() => organizationRequest(`/domains/${id}`))
   );
 
-  server.tool(
+  server.registerTool(
     "create-domain",
-    "Create a new sending domain in your MailPace organization.",
     {
-      url: z
-        .string()
-        .describe("Lower-case domain with TLD, for example example.com"),
-      name: z.string().optional().describe("Friendly name for your reference"),
+      description: "Create a new sending domain in your MailPace organization.",
+      inputSchema: z.object({
+        url: z
+          .string()
+          .describe("Lower-case domain with TLD, for example example.com"),
+        name: z.string().optional().describe("Friendly name for your reference"),
+      }),
     },
     async ({ url, name }) =>
       runOrganizationTool(() =>
@@ -275,16 +284,18 @@ if (organizationToken) {
       )
   );
 
-  server.tool(
+  server.registerTool(
     "update-domain",
-    "Update the name or URL of a MailPace domain.",
     {
-      id: z.number().int().describe("The domain ID"),
-      name: z.string().optional().describe("Friendly name for your reference"),
-      url: z
-        .string()
-        .optional()
-        .describe("Lower-case domain with TLD, for example example.com"),
+      description: "Update the name or URL of a MailPace domain.",
+      inputSchema: z.object({
+        id: z.number().int().describe("The domain ID"),
+        name: z.string().optional().describe("Friendly name for your reference"),
+        url: z
+          .string()
+          .optional()
+          .describe("Lower-case domain with TLD, for example example.com"),
+      }),
     },
     async ({ id, name, url }) => {
       if (name === undefined && url === undefined) {
@@ -305,11 +316,14 @@ if (organizationToken) {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "verify-domain",
-    "Check the DKIM and advanced verification DNS records for a MailPace domain.",
     {
-      id: z.number().int().describe("The domain ID"),
+      description:
+        "Check the DKIM and advanced verification DNS records for a MailPace domain.",
+      inputSchema: z.object({
+        id: z.number().int().describe("The domain ID"),
+      }),
     },
     async ({ id }) =>
       runOrganizationTool(() =>
@@ -317,11 +331,13 @@ if (organizationToken) {
       )
   );
 
-  server.tool(
+  server.registerTool(
     "list-domain-api-tokens",
-    "List the API tokens for a MailPace domain.",
     {
-      domain_id: z.number().int().describe("The domain ID"),
+      description: "List the API tokens for a MailPace domain.",
+      inputSchema: z.object({
+        domain_id: z.number().int().describe("The domain ID"),
+      }),
     },
     async ({ domain_id }) =>
       runOrganizationTool(() =>
@@ -329,12 +345,14 @@ if (organizationToken) {
       )
   );
 
-  server.tool(
+  server.registerTool(
     "get-domain-api-token",
-    "Get a single API token for a MailPace domain.",
     {
-      domain_id: z.number().int().describe("The domain ID"),
-      id: z.number().int().describe("The API token ID"),
+      description: "Get a single API token for a MailPace domain.",
+      inputSchema: z.object({
+        domain_id: z.number().int().describe("The domain ID"),
+        id: z.number().int().describe("The API token ID"),
+      }),
     },
     async ({ domain_id, id }) =>
       runOrganizationTool(() =>
@@ -342,12 +360,14 @@ if (organizationToken) {
       )
   );
 
-  server.tool(
+  server.registerTool(
     "create-domain-api-token",
-    "Create a new API token for a MailPace domain.",
     {
-      domain_id: z.number().int().describe("The domain ID"),
-      name: z.string().optional().describe("Friendly token label"),
+      description: "Create a new API token for a MailPace domain.",
+      inputSchema: z.object({
+        domain_id: z.number().int().describe("The domain ID"),
+        name: z.string().optional().describe("Friendly token label"),
+      }),
     },
     async ({ domain_id, name }) =>
       runOrganizationTool(() =>
@@ -358,13 +378,15 @@ if (organizationToken) {
       )
   );
 
-  server.tool(
+  server.registerTool(
     "update-domain-api-token",
-    "Update the name of an API token for a MailPace domain.",
     {
-      domain_id: z.number().int().describe("The domain ID"),
-      id: z.number().int().describe("The API token ID"),
-      name: z.string().optional().describe("Friendly token label"),
+      description: "Update the name of an API token for a MailPace domain.",
+      inputSchema: z.object({
+        domain_id: z.number().int().describe("The domain ID"),
+        id: z.number().int().describe("The API token ID"),
+        name: z.string().optional().describe("Friendly token label"),
+      }),
     },
     async ({ domain_id, id, name }) => {
       if (name === undefined) {
@@ -380,12 +402,15 @@ if (organizationToken) {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "revoke-domain-api-token",
-    "Revoke an API token for a MailPace domain. This cannot be undone.",
     {
-      domain_id: z.number().int().describe("The domain ID"),
-      id: z.number().int().describe("The API token ID"),
+      description:
+        "Revoke an API token for a MailPace domain. This cannot be undone.",
+      inputSchema: z.object({
+        domain_id: z.number().int().describe("The domain ID"),
+        id: z.number().int().describe("The API token ID"),
+      }),
     },
     async ({ domain_id, id }) =>
       runOrganizationTool(() =>
