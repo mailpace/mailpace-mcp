@@ -93,6 +93,30 @@ const messageSchema = z
   })
   .passthrough();
 
+const emailStatusSchema = z
+  .object({
+    id: z.number().int(),
+    domain_id: z.number().int(),
+    status: z.string(),
+    message_id: z.string().nullable().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    cc: z.string().nullable().optional(),
+    bcc: z.string().nullable().optional(),
+    subject: z.string().nullable().optional(),
+    replyto: z.string().nullable().optional(),
+    inreplyto: z.string().nullable().optional(),
+    references: z.string().nullable().optional(),
+    list_unsubscribe: z.string().nullable().optional(),
+    tags: z.array(z.string()).optional(),
+    bounce_reason: z.string().nullable().optional(),
+    bounce: z.record(z.string(), z.unknown()).nullable().optional(),
+    deferred: z.record(z.string(), z.unknown()).nullable().optional(),
+    created_at: z.string().optional(),
+    modified_at: z.string().optional(),
+  })
+  .passthrough();
+
 const sendEmailSchema = z.object({
   id: z.number().int(),
   status: z.string(),
@@ -395,15 +419,22 @@ function serverRequest(
   });
 }
 
-async function runOrganizationTool(
-  operation: () => Promise<unknown>
+async function runApiTool(
+  operation: () => Promise<unknown>,
+  label = "MailPace API"
 ): Promise<ToolResult> {
   try {
     return jsonResult(await operation());
   } catch (error: any) {
-    console.error(`MailPace Domains API error: ${error.message}`);
+    console.error(`${label} error: ${error.message}`);
     return errorResult(error.message || String(error));
   }
+}
+
+function runOrganizationTool(
+  operation: () => Promise<unknown>
+): Promise<ToolResult> {
+  return runApiTool(operation, "MailPace Domains API");
 }
 
 // Define the email tool
@@ -456,6 +487,44 @@ if (apiToken) {
         };
       }
     }
+  );
+}
+
+// Email status can be read with either an organization token or the
+// domain's server token.
+if (apiToken || organizationToken) {
+  server.registerTool(
+    "mailpace_get_email_status",
+    {
+      title: "Get Email Status",
+      description:
+        "Get the delivery status of an email, including bounce or deferral details.",
+      inputSchema: z.object({
+        domain_id: z
+          .number()
+          .int()
+          .describe("ID of the domain the email was sent from"),
+        id: z
+          .number()
+          .int()
+          .describe("Email ID returned by mailpace_send_email"),
+      }),
+      outputSchema: emailStatusSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ domain_id, id }) =>
+      runApiTool(
+        () =>
+          organizationToken
+            ? organizationRequest(`/domains/${domain_id}/emails/${id}`)
+            : serverRequest(`/domains/${domain_id}/emails/${id}`),
+        "MailPace Email Status API"
+      )
   );
 }
 
