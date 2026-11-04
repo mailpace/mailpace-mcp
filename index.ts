@@ -50,10 +50,31 @@ try {
   console.error(error.message);
   process.exit(1);
 }
-const REQUEST_TIMEOUT_MS = Number(
-  process.env.MAILPACE_REQUEST_TIMEOUT_MS || 30_000
+function readIntegerEnv(
+  name: string,
+  fallback: number,
+  minimum: number
+): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") {
+    return fallback;
+  }
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < minimum) {
+    console.error(`${name} must be an integer greater than or equal to ${minimum}`);
+    process.exit(1);
+  }
+
+  return value;
+}
+
+const REQUEST_TIMEOUT_MS = readIntegerEnv(
+  "MAILPACE_REQUEST_TIMEOUT_MS",
+  30_000,
+  1
 );
-const MAX_RETRIES = Number(process.env.MAILPACE_MAX_RETRIES ?? 2);
+const MAX_RETRIES = readIntegerEnv("MAILPACE_MAX_RETRIES", 2, 0);
 
 const server = new McpServer(
   {
@@ -63,9 +84,9 @@ const server = new McpServer(
   {
     instructions:
       "MailPace provides transactional email sending and domain management. " +
-      "MAILPACE_API_TOKEN enables send-email and email status lookups for one domain. " +
-      "MAILPACE_ORGANIZATION_TOKEN enables domain and domain API token management. " +
-      "Sending email is an external side effect; confirm recipients before calling send-email.",
+      "MAILPACE_API_TOKEN enables mailpace_send_email and mailpace_get_email_status for one domain. " +
+      "MAILPACE_ORGANIZATION_TOKEN enables domain and domain API token management, plus mailpace_get_email_status for any domain. " +
+      "Sending email is an external side effect; confirm recipients before calling mailpace_send_email.",
     maxToolInputElements: 10_000,
   }
 );
