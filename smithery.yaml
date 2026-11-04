@@ -18,17 +18,14 @@ startCommand:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
     |-
     (config) => {
-      const args = ['run', 'start', '--'];
       const env = {};
       if (config.mailpaceApiToken) {
-        args.push('--token', config.mailpaceApiToken);
         env.MAILPACE_API_TOKEN = config.mailpaceApiToken;
       }
       if (config.mailpaceOrganizationToken) {
-        args.push('--organization-token', config.mailpaceOrganizationToken);
         env.MAILPACE_ORGANIZATION_TOKEN = config.mailpaceOrganizationToken;
       }
-      return { command: 'npm', args, env };
+      return { command: 'npm', args: ['run', 'start'], env };
     }
   exampleConfig:
     mailpaceApiToken: dummy-token-123

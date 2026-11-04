@@ -2,21 +2,17 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { createRequire } from "node:module";
 import * as z from "zod/v4";
-import minimist from "minimist";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 
-const argv = minimist(process.argv.slice(2));
-const apiToken = argv.token || process.env.MAILPACE_API_TOKEN;
-const organizationToken =
-  argv["organization-token"] || process.env.MAILPACE_ORGANIZATION_TOKEN;
+const apiToken = process.env.MAILPACE_API_TOKEN;
+const organizationToken = process.env.MAILPACE_ORGANIZATION_TOKEN;
 
 if (!apiToken && !organizationToken) {
   console.error(
     "No API token provided. Set MAILPACE_API_TOKEN (to send email) and/or " +
-      "MAILPACE_ORGANIZATION_TOKEN (to manage domains), or pass --token / " +
-      "--organization-token."
+      "MAILPACE_ORGANIZATION_TOKEN (to manage domains)."
   );
   process.exit(1);
 }
