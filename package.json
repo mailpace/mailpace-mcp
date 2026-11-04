@@ -1,7 +1,7 @@
 {
   "name": "mailpace-mcp",
-  "version": "1.0.0",
-  "description": "MCP server supporting MailPace Send API for transactional emails",
+  "version": "1.1.0",
+  "description": "MCP server supporting the MailPace Send API and Domains API",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

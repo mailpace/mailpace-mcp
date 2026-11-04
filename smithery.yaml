@@ -8,15 +8,28 @@ startCommand:
     properties:
       mailpaceApiToken:
         type: string
-        description: MailPace API token for sending emails. Can also be set in the
-          MAILPACE_API_TOKEN env variable.
+        description: MailPace domain API token for sending emails. Can also be set
+          in the MAILPACE_API_TOKEN env variable.
+      mailpaceOrganizationToken:
+        type: string
+        description: MailPace organization API token for managing domains. Can also
+          be set in the MAILPACE_ORGANIZATION_TOKEN env variable.
   commandFunction:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
     |-
-    (config) => ({
-      command: 'npm',
-      args: ['run', 'start'].concat(config.mailpaceApiToken ? ['--token', config.mailpaceApiToken] : []),
-      env: config.mailpaceApiToken ? { MAILPACE_API_TOKEN: config.mailpaceApiToken } : {}
-    })
+    (config) => {
+      const args = ['run', 'start', '--'];
+      const env = {};
+      if (config.mailpaceApiToken) {
+        args.push('--token', config.mailpaceApiToken);
+        env.MAILPACE_API_TOKEN = config.mailpaceApiToken;
+      }
+      if (config.mailpaceOrganizationToken) {
+        args.push('--organization-token', config.mailpaceOrganizationToken);
+        env.MAILPACE_ORGANIZATION_TOKEN = config.mailpaceOrganizationToken;
+      }
+      return { command: 'npm', args, env };
+    }
   exampleConfig:
     mailpaceApiToken: dummy-token-123
+    mailpaceOrganizationToken: dummy-organization-token-123
