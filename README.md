@@ -1,7 +1,5 @@
 # MailPace MCP (Model Context Protocol) Server
 
-[![smithery badge](https://smithery.ai/badge/@mailpace/mailpace-mcp)](https://smithery.ai/server/@mailpace/mailpace-mcp)
-
 MailPace MCP Server exposes the [MailPace](https://mailpace.com) transactional email, domain management, and email status APIs to MCP clients.
 
 ## Features
@@ -82,12 +80,6 @@ After building locally, point your MCP client at the built entry point:
 ```
 
 Once published, this can also be run with `npx -y mailpace-mcp`.
-
-### Installing via Smithery
-
-```bash
-npx -y @smithery/cli install @mailpace/mailpace-mcp --client claude
-```
 
 ## Build and run
 
