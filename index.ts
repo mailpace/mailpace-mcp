@@ -1,7 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import MailPace from "@mailpace/mailpace.js";
 import minimist from "minimist";
 
 const argv = minimist(process.argv.slice(2));
@@ -17,8 +16,6 @@ if (!apiToken && !organizationToken) {
   );
   process.exit(1);
 }
-
-const client = apiToken ? new MailPace.DomainClient(apiToken) : null;
 
 const API_BASE_URL =
   process.env.MAILPACE_API_URL || "https://app.mailpace.com/api/v1";
@@ -51,16 +48,25 @@ function errorResult(message: string): ToolResult {
   };
 }
 
-async function organizationRequest(
+type ApiRequestOptions = {
+  method?: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+  token: string;
+  tokenHeader: "MailPace-Organization-Token" | "MailPace-Server-Token";
+};
+
+async function apiRequest(
   path: string,
-  options: { method?: string; body?: unknown } = {}
+  options: ApiRequestOptions
 ): Promise<unknown> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method || "GET",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "MailPace-Organization-Token": organizationToken as string,
+      [options.tokenHeader]: options.token,
+      ...options.headers,
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
@@ -94,6 +100,28 @@ async function organizationRequest(
   return data;
 }
 
+function organizationRequest(
+  path: string,
+  options: Omit<ApiRequestOptions, "token" | "tokenHeader"> = {}
+): Promise<unknown> {
+  return apiRequest(path, {
+    ...options,
+    token: organizationToken as string,
+    tokenHeader: "MailPace-Organization-Token",
+  });
+}
+
+function serverRequest(
+  path: string,
+  options: Omit<ApiRequestOptions, "token" | "tokenHeader"> = {}
+): Promise<unknown> {
+  return apiRequest(path, {
+    ...options,
+    token: apiToken as string,
+    tokenHeader: "MailPace-Server-Token",
+  });
+}
+
 async function runOrganizationTool(
   operation: () => Promise<unknown>
 ): Promise<ToolResult> {
@@ -106,7 +134,7 @@ async function runOrganizationTool(
 }
 
 // Define the email tool
-if (client) {
+if (apiToken) {
   server.tool(
     "send-email",
     {
@@ -148,7 +176,10 @@ if (client) {
         }
 
         // Send the email
-        const result = await client.sendEmail(params);
+        const result = (await serverRequest("/send", {
+          method: "POST",
+          body: params,
+        })) as { id: number; status: string };
 
         return {
           content: [
@@ -370,7 +401,7 @@ async function main() {
   await server.connect(transport);
   console.error(
     `MailPace MCP Server running on stdio (email sending: ${
-      client ? "enabled" : "disabled"
+      apiToken ? "enabled" : "disabled"
     }, domain management: ${organizationToken ? "enabled" : "disabled"})`
   );
 }
