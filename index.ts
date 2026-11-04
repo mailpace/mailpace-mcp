@@ -1,7 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import { createRequire } from "node:module";
 import * as z from "zod/v4";
 import minimist from "minimist";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
 
 const argv = minimist(process.argv.slice(2));
 const apiToken = argv.token || process.env.MAILPACE_API_TOKEN;
@@ -20,10 +24,20 @@ if (!apiToken && !organizationToken) {
 const API_BASE_URL =
   process.env.MAILPACE_API_URL || "https://app.mailpace.com/api/v1";
 
-const server = new McpServer({
-  name: "transactional-email-sending-service",
-  version: "1.1.0",
-});
+const server = new McpServer(
+  {
+    name: "mailpace",
+    version,
+  },
+  {
+    instructions:
+      "MailPace provides transactional email sending and domain management. " +
+      "MAILPACE_API_TOKEN enables send-email and email status lookups for one domain. " +
+      "MAILPACE_ORGANIZATION_TOKEN enables domain and domain API token management. " +
+      "Sending email is an external side effect; confirm recipients before calling send-email.",
+    maxToolInputElements: 10_000,
+  }
+);
 
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
