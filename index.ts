@@ -98,6 +98,210 @@ const sendEmailSchema = z.object({
   status: z.string(),
 });
 
+const EMAIL_ADDRESS_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+const ATTACHMENT_EXTENSIONS = new Set([
+  "jpeg",
+  "jpg",
+  "png",
+  "gif",
+  "txt",
+  "pdf",
+  "docx",
+  "xlsx",
+  "pptx",
+  "csv",
+  "att",
+  "ics",
+  "ical",
+  "html",
+  "zip",
+  "auf",
+  "xml",
+  "dwg",
+]);
+const MAX_RECIPIENTS = 50;
+const MAX_ATTACHMENT_BYTES = 30 * 1024 * 1024;
+
+function splitAddressList(value: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let angleDepth = 0;
+
+  for (const char of value) {
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "<" && !inQuotes) {
+      angleDepth += 1;
+    } else if (char === ">" && !inQuotes) {
+      angleDepth = Math.max(0, angleDepth - 1);
+    }
+
+    if (char === "," && !inQuotes && angleDepth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  parts.push(current);
+  return parts.map((part) => part.trim()).filter(Boolean);
+}
+
+function isValidAddress(value: string): boolean {
+  const trimmed = value.trim();
+  const angleMatch = trimmed.match(/^.*<([^<>]+)>$/);
+  const address = (angleMatch ? angleMatch[1] : trimmed).trim();
+  return EMAIL_ADDRESS_RE.test(address);
+}
+
+const emailAddressSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(isValidAddress, {
+    message:
+      "Must be an email address or an RFC 822 name & addr-spec, for example 'Name <user@example.com>'",
+  });
+
+const emailListSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(
+    (value) => {
+      const addresses = splitAddressList(value);
+      return addresses.length > 0 && addresses.every(isValidAddress);
+    },
+    {
+      message:
+        "Must be a comma-separated list of email addresses or RFC 822 name & addr-spec entries",
+    }
+  );
+
+const attachmentSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .refine(
+      (name) => {
+        const parts = name.split(".");
+        return (
+          parts.length === 2 &&
+          ATTACHMENT_EXTENSIONS.has(parts[1].toLowerCase())
+        );
+      },
+      {
+        message:
+          "File names must have exactly one full stop and use a supported extension",
+      }
+    )
+    .describe(
+      "File name including extension, for example invoice.pdf. Must contain exactly one full stop."
+    ),
+  content: z.string().min(1).describe("Base64-encoded file contents"),
+  content_type: z
+    .string()
+    .min(1)
+    .describe("MIME type, for example application/pdf"),
+  cid: z
+    .string()
+    .optional()
+    .describe("Optional content ID for inline images"),
+});
+
+const sendEmailInputSchema = z
+  .object({
+    from: emailAddressSchema.describe(
+      "Sender email address or RFC 822 name & addr-spec, for example 'Name <user@example.com>'. The domain must match the API token."
+    ),
+    to: emailListSchema.describe(
+      "Recipient address or comma-separated list of recipients (maximum 50 total including cc and bcc)"
+    ),
+    subject: z.string().optional().describe("Email subject"),
+    htmlbody: z
+      .string()
+      .optional()
+      .describe("HTML body. Required if textbody is not provided."),
+    textbody: z
+      .string()
+      .optional()
+      .describe("Plain-text body. Required if htmlbody is not provided."),
+    cc: emailListSchema
+      .optional()
+      .describe("Optional comma-separated CC recipients"),
+    bcc: emailListSchema
+      .optional()
+      .describe("Optional comma-separated BCC recipients"),
+    replyto: emailAddressSchema
+      .optional()
+      .describe("Optional Reply-To address"),
+    inreplyto: z
+      .string()
+      .optional()
+      .describe("Optional In-Reply-To message ID"),
+    references: z
+      .string()
+      .optional()
+      .describe("Optional space-separated References message IDs"),
+    list_unsubscribe: z
+      .string()
+      .optional()
+      .describe("Optional List-Unsubscribe header value"),
+    attachments: z
+      .array(attachmentSchema)
+      .optional()
+      .describe("Optional attachments. Total email size must not exceed 30 MB."),
+    tags: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .describe("Optional tag or list of tags for filtering and analytics"),
+    idempotency_key: z
+      .string()
+      .min(1)
+      .max(255)
+      .optional()
+      .describe(
+        "Optional unique key (for example a UUIDv4) that prevents sending the same email twice when retrying"
+      ),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.textbody && !value.htmlbody) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Either textbody or htmlbody must be provided",
+        path: ["textbody"],
+      });
+    }
+
+    const recipients = [value.to, value.cc, value.bcc]
+      .filter((address): address is string => Boolean(address))
+      .flatMap(splitAddressList);
+
+    if (recipients.length > MAX_RECIPIENTS) {
+      ctx.addIssue({
+        code: "custom",
+        message: `A maximum of ${MAX_RECIPIENTS} recipients is allowed`,
+        path: ["to"],
+      });
+    }
+
+    const attachmentBytes = (value.attachments ?? []).reduce(
+      (total, attachment) =>
+        total + Math.ceil((attachment.content.length * 3) / 4),
+      0
+    );
+
+    if (attachmentBytes > MAX_ATTACHMENT_BYTES) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Attachments must not exceed 30 MB in total",
+        path: ["attachments"],
+      });
+    }
+  });
+
 function jsonResult(data: unknown): ToolResult {
   return {
     content: [{ type: "text", text: JSON.stringify(data) }],
@@ -210,30 +414,7 @@ if (apiToken) {
       title: "Send Email",
       description:
         "Send a transactional email through MailPace. Requires a domain API token.",
-      inputSchema: z.object({
-        from: z.string().email(),
-        to: z.string(),
-        subject: z.string().optional(),
-        htmlbody: z.string().optional(),
-        textbody: z.string().optional(),
-        cc: z.string().optional(),
-        bcc: z.string().optional(),
-        replyto: z.string().optional(),
-        inreplyto: z.string().optional(),
-        references: z.string().optional(),
-        list_unsubscribe: z.string().optional(),
-        attachments: z
-          .array(
-            z.object({
-              name: z.string(),
-              content: z.string(),
-              content_type: z.string(),
-              cid: z.string().optional(),
-            })
-          )
-          .optional(),
-        tags: z.union([z.string(), z.array(z.string())]).optional(),
-      }),
+      inputSchema: sendEmailInputSchema,
       outputSchema: sendEmailSchema,
       annotations: {
         readOnlyHint: false,
@@ -242,24 +423,14 @@ if (apiToken) {
         openWorldHint: true,
       },
     },
-    async (params, _extra) => {
+    async ({ idempotency_key, ...email }, _extra) => {
       try {
-        if (!params.textbody && !params.htmlbody) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "Either text or html content must be provided",
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        // Send the email
         const result = (await serverRequest("/send", {
           method: "POST",
-          body: params,
+          body: email,
+          headers: idempotency_key
+            ? { "Idempotency-Key": idempotency_key }
+            : undefined,
         })) as { id: number; status: string };
 
         return jsonResult({ id: result.id, status: result.status });
