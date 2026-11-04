@@ -17,8 +17,38 @@ if (!apiToken && !organizationToken) {
   process.exit(1);
 }
 
-const API_BASE_URL =
-  process.env.MAILPACE_API_URL || "https://app.mailpace.com/api/v1";
+function normalizeApiBaseUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`Invalid MAILPACE_API_URL: ${value}`);
+  }
+
+  const isLocalhost =
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1" ||
+    url.hostname === "::1" ||
+    url.hostname === "[::1]";
+
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalhost)) {
+    throw new Error(
+      "MAILPACE_API_URL must use HTTPS, except for localhost development URLs"
+    );
+  }
+
+  return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+}
+
+let API_BASE_URL: string;
+try {
+  API_BASE_URL = normalizeApiBaseUrl(
+    process.env.MAILPACE_API_URL || "https://app.mailpace.com/api/v1"
+  );
+} catch (error: any) {
+  console.error(error.message);
+  process.exit(1);
+}
 const REQUEST_TIMEOUT_MS = Number(
   process.env.MAILPACE_REQUEST_TIMEOUT_MS || 30_000
 );
