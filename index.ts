@@ -356,23 +356,74 @@ const sendEmailInputSchema = z
     }
   });
 
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+const MAX_ERROR_DETAIL_LENGTH = 1000;
+
 function jsonResult(data: unknown): ToolResult {
+  const isObject =
+    data !== null && typeof data === "object" && !Array.isArray(data);
+
   return {
     content: [{ type: "text", text: JSON.stringify(data) }],
-    structuredContent: data as Record<string, unknown>,
+    ...(isObject
+      ? { structuredContent: data as Record<string, unknown> }
+      : {}),
   };
 }
 
 function errorResult(message: string): ToolResult {
   return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify({ success: false, error: message }, null, 2),
-      },
-    ],
+    content: [{ type: "text", text: message }],
     isError: true,
   };
+}
+
+function truncate(text: string, maxLength = MAX_ERROR_DETAIL_LENGTH): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}…`;
+}
+
+function describeRequestFailure(
+  error: any,
+  options: ApiRequestOptions
+): string | null {
+  if (options.signal?.aborted) {
+    return "MailPace API request cancelled";
+  }
+  if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+    return `MailPace API request timed out after ${REQUEST_TIMEOUT_MS}ms`;
+  }
+  return null;
+}
+
+function formatApiError(
+  status: number,
+  statusText: string,
+  detail: string,
+  tokenHeader: ApiRequestOptions["tokenHeader"]
+): string {
+  const safeDetail = truncate(detail.trim() || "Unknown error");
+  const tokenName =
+    tokenHeader === "MailPace-Organization-Token"
+      ? "organization API token"
+      : "domain server token";
+
+  switch (status) {
+    case 401:
+      return `MailPace authentication failed (401). Check that the ${tokenName} is valid and has not been revoked. ${safeDetail}`;
+    case 403:
+      return `MailPace denied the request (403). The ${tokenName} may not have access to this resource. ${safeDetail}`;
+    case 404:
+      return `MailPace resource not found (404). Check the domain, email, or token ID. ${safeDetail}`;
+    case 422:
+      return `MailPace rejected the request (422): ${safeDetail}`;
+    case 429:
+      return `MailPace rate limit exceeded (429). Retry later. ${safeDetail}`;
+    default:
+      return `MailPace API request failed (${status} ${statusText}): ${safeDetail}`;
+  }
 }
 
 type ApiRequestOptions = {
@@ -452,13 +503,9 @@ async function apiRequest(
         signal,
       });
     } catch (error: any) {
-      if (options.signal?.aborted) {
-        throw new Error("MailPace API request cancelled");
-      }
-      if (error?.name === "TimeoutError") {
-        throw new Error(
-          `MailPace API request timed out after ${REQUEST_TIMEOUT_MS}ms`
-        );
+      const failure = describeRequestFailure(error, options);
+      if (failure) {
+        throw new Error(failure);
       }
 
       const cause = error?.cause?.message ? `: ${error.cause.message}` : "";
@@ -472,7 +519,35 @@ async function apiRequest(
       throw new Error(`MailPace API request failed: ${message}`);
     }
 
-    const responseText = await response.text();
+    const contentLength = Number(response.headers.get("content-length"));
+    if (
+      Number.isFinite(contentLength) &&
+      contentLength > MAX_RESPONSE_BYTES
+    ) {
+      throw new Error(
+        `MailPace API response exceeded the ${MAX_RESPONSE_BYTES} byte limit`
+      );
+    }
+
+    let responseText: string;
+    try {
+      responseText = await response.text();
+    } catch (error: any) {
+      const failure = describeRequestFailure(error, options);
+      if (failure) {
+        throw new Error(failure);
+      }
+      throw new Error(
+        `MailPace API response could not be read: ${error?.message || error}`
+      );
+    }
+
+    if (responseText.length > MAX_RESPONSE_BYTES) {
+      throw new Error(
+        `MailPace API response exceeded the ${MAX_RESPONSE_BYTES} byte limit`
+      );
+    }
+
     let data: unknown = null;
 
     if (responseText) {
@@ -504,9 +579,12 @@ async function apiRequest(
       );
     }
     throw new Error(
-      `MailPace API request failed (${response.status} ${
-        response.statusText
-      }): ${detail || "Unknown error"}`
+      formatApiError(
+        response.status,
+        response.statusText,
+        detail,
+        options.tokenHeader
+      )
     );
   }
 }
@@ -582,24 +660,7 @@ if (apiToken) {
         return jsonResult({ id: result.id, status: result.status });
       } catch (error: any) {
         console.error(`Error sending email: ${error.message}`);
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  success: false,
-                  message: "Failed to send email",
-                  error: error.message,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return errorResult(error.message || String(error));
       }
     }
   );
