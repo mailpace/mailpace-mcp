@@ -205,7 +205,7 @@ async function runOrganizationTool(
 // Define the email tool
 if (apiToken) {
   server.registerTool(
-    "send-email",
+    "mailpace_send_email",
     {
       title: "Send Email",
       description:
@@ -291,7 +291,7 @@ if (apiToken) {
 // Domains API tools. These require an Organization API token.
 if (organizationToken) {
   server.registerTool(
-    "list-domains",
+    "mailpace_list_domains",
     {
       title: "List Domains",
       description: "List the domains belonging to your MailPace organization.",
@@ -326,7 +326,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "get-domain",
+    "mailpace_get_domain",
     {
       title: "Get Domain",
       description: "Get a single MailPace domain by ID.",
@@ -346,7 +346,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "create-domain",
+    "mailpace_create_domain",
     {
       title: "Create Domain",
       description: "Create a new sending domain in your MailPace organization.",
@@ -374,7 +374,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "update-domain",
+    "mailpace_update_domain",
     {
       title: "Update Domain",
       description:
@@ -415,7 +415,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "verify-domain",
+    "mailpace_verify_domain",
     {
       title: "Verify Domain",
       description:
@@ -438,7 +438,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "list-domain-api-tokens",
+    "mailpace_list_domain_api_tokens",
     {
       title: "List Domain API Tokens",
       description: "List the API tokens for a MailPace domain.",
@@ -462,7 +462,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "get-domain-api-token",
+    "mailpace_get_domain_api_token",
     {
       title: "Get Domain API Token",
       description: "Get a single API token for a MailPace domain.",
@@ -485,7 +485,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "create-domain-api-token",
+    "mailpace_create_domain_api_token",
     {
       title: "Create Domain API Token",
       description:
@@ -512,7 +512,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "update-domain-api-token",
+    "mailpace_update_domain_api_token",
     {
       title: "Update Domain API Token",
       description: "Update the name of an API token for a MailPace domain.",
@@ -544,7 +544,7 @@ if (organizationToken) {
   );
 
   server.registerTool(
-    "revoke-domain-api-token",
+    "mailpace_revoke_domain_api_token",
     {
       title: "Revoke Domain API Token",
       description:
