@@ -49,7 +49,12 @@ jobs:
           mv server.tmp server.json
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          if npm view "mailpace-mcp@${VERSION}" version >/dev/null 2>&1; then
+            echo "mailpace-mcp@${VERSION} is already published; skipping npm publish"
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
