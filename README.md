@@ -127,7 +127,16 @@ com.mailpace/mailpace-mcp
 
 ### One-time setup
 
-1. Create an npm automation token with publish access and add it as the `NPM_TOKEN` repository secret.
+1. Configure npm Trusted Publishing for `@mailpace/mcp`:
+   - Open `https://www.npmjs.com/package/@mailpace/mcp/access`
+   - Under **Trusted Publisher**, choose **GitHub Actions**
+   - Organization or user: `mailpace`
+   - Repository: `mailpace-mcp`
+   - Workflow filename: `release.yml`
+   - Allowed action: **npm publish**
+
+   The release workflow authenticates to npm with GitHub OIDC, so no `NPM_TOKEN` secret is used.
+
 2. Generate an Ed25519 key pair for DNS authentication:
 
    ```bash
@@ -154,7 +163,9 @@ git tag v2.0.0
 git push origin v2.0.0
 ```
 
-The `Release` workflow runs typechecking and tests, verifies the tag matches `package.json`, publishes to npm, waits for the package to appear, and publishes the version metadata to the Official MCP Registry.
+Because `2.0.0` was published before trusted publishing was enabled, use a new version such as `2.0.1` for the first workflow release. This lets npm validate the trusted publisher within its setup window. Subsequent tags publish normally with OIDC.
+
+The `Release` workflow runs typechecking and tests, verifies the tag matches `package.json`, publishes to npm using GitHub OIDC, waits for the package to appear, and publishes the version metadata to the Official MCP Registry.
 
 ## Security
 
