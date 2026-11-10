@@ -167,6 +167,8 @@ Because `2.0.0` was published before trusted publishing was enabled, use a new v
 
 The `Release` workflow runs typechecking and tests, verifies the tag matches `package.json`, publishes to npm using GitHub OIDC, waits for the package to appear, and publishes the version metadata to the Official MCP Registry.
 
+If npm publishing succeeds but the registry step fails, run the **Publish MCP Registry** workflow manually with the version that is already on npm.
+
 ## Security
 
 - Tokens are read from the environment only.
