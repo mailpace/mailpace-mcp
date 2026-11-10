@@ -1,5 +1,5 @@
 {
-  "name": "mailpace-mcp",
+  "name": "@mailpace/mcp",
   "version": "2.0.0",
   "mcpName": "com.mailpace/mailpace-mcp",
   "description": "MCP server for the MailPace Send API, Domains API, and Email Status API",
@@ -43,6 +43,9 @@
   ],
   "author": "MailPace",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
     "zod": "^4.6.7"

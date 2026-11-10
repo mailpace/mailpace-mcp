@@ -50,8 +50,8 @@ jobs:
 
       - name: Publish to npm
         run: |
-          if npm view "mailpace-mcp@${VERSION}" version >/dev/null 2>&1; then
-            echo "mailpace-mcp@${VERSION} is already published; skipping npm publish"
+          if npm view "@mailpace/mcp@${VERSION}" version >/dev/null 2>&1; then
+            echo "@mailpace/mcp@${VERSION} is already published; skipping npm publish"
           else
             npm publish --access public
           fi
@@ -61,12 +61,12 @@ jobs:
       - name: Wait for the npm package to become available
         run: |
           for attempt in {1..12}; do
-            if npm view "mailpace-mcp@${VERSION}" version >/dev/null 2>&1; then
+            if npm view "@mailpace/mcp@${VERSION}" version >/dev/null 2>&1; then
               exit 0
             fi
             sleep 5
           done
-          echo "Timed out waiting for mailpace-mcp@${VERSION} on npm"
+          echo "Timed out waiting for @mailpace/mcp@${VERSION} on npm"
           exit 1
 
       - name: Install mcp-publisher

@@ -79,7 +79,7 @@ After building locally, point your MCP client at the built entry point:
 }
 ```
 
-Once published, this can also be run with `npx -y mailpace-mcp`.
+Once published, this can also be run with `npx -y @mailpace/mcp`.
 
 ## Build and run
 
@@ -117,7 +117,7 @@ The image runs as the non-root `node` user and installs only production dependen
 
 ## Publishing
 
-The package is published as `mailpace-mcp` on npm and registered with the [Official MCP Registry](https://registry.modelcontextprotocol.io) as:
+The package is published as `@mailpace/mcp` on npm and registered with the [Official MCP Registry](https://registry.modelcontextprotocol.io) as:
 
 ```text
 com.mailpace/mailpace-mcp
