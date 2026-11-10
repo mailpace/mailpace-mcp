@@ -54,16 +54,17 @@ jobs:
 
       - name: Publish to npm with trusted publishing
         run: |
-          if npm view "@mailpace/mcp@${VERSION}" version >/dev/null 2>&1; then
+          if curl -fsS "https://registry.npmjs.org/@mailpace%2fmcp/${VERSION}" >/dev/null 2>&1; then
             echo "@mailpace/mcp@${VERSION} is already published; skipping npm publish"
           else
+            unset NODE_AUTH_TOKEN
             npm publish --access public
           fi
 
       - name: Wait for the npm package to become available
         run: |
           for attempt in {1..12}; do
-            if npm view "@mailpace/mcp@${VERSION}" version >/dev/null 2>&1; then
+            if curl -fsS "https://registry.npmjs.org/@mailpace%2fmcp/${VERSION}" >/dev/null 2>&1; then
               exit 0
             fi
             sleep 5
